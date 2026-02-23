@@ -1,0 +1,12 @@
+# Ignore Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Ignore large Data files (Upload your scripts, keep your data local)
+data/
+*.csv
+
+# Ignore trained models (Optional, but keeps repo clean)
+*.h5
+*.tflite
