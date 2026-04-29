@@ -1,4 +1,4 @@
-time,raw_flux,amplified flux,voltage,current,speed
+time, raw_flux, amplified flux, voltage, current, speed
 190.018,-0.38,-19.00,409.0,1.53,1238
 190.100,-0.46,-22.99,409.0,1.53,1238
 190.182,-0.46,-22.99,409.0,1.53,1238

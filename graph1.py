@@ -1,53 +1,61 @@
-# =======================================================
-# STEP 6: PPT VISUALIZATIONS (GRAPHS)
-# =======================================================
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
+from tensorflow.keras.models import load_model
+from sklearn.metrics import confusion_matrix, classification_report
+from scipy.fft import fft
 
-print("\n7. Generating PPT Graphs...")
+print("1. Loading the New Trained AI Brain and Data...")
+model = load_model(r"C:\SEC project\best_attention_motor_model.h5")
+df = pd.read_csv(r"C:\SEC project\hybrid_motor_data.csv")
 
-# GRAPH 1: 5-Fold Cross Validation Bar Chart
-plt.figure(figsize=(10, 5))
-fold_labels = ['Fold 1', 'Fold 2', 'Fold 3', 'Fold 4', 'Fold 5']
-colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336']
+# Ensure proper formatting
+df['time'] = pd.to_numeric(df['time'], errors='coerce')
+df['amplified flux'] = pd.to_numeric(df['amplified flux'], errors='coerce')
+df['speed'] = pd.to_numeric(df['speed'], errors='coerce')
+df = df.dropna(subset=['time', 'amplified flux', 'speed'])
 
-bars = plt.bar(fold_labels, cv_scores, color=colors)
-plt.axhline(y=np.mean(cv_scores), color='r', linestyle='--', label=f'Average: {np.mean(cv_scores):.2f}%')
+print("2. Normalizing and Labeling (Same as Training)...")
+df['amplified flux'] = (df['amplified flux'] - df['amplified flux'].min()) / (df['amplified flux'].max() - df['amplified flux'].min())
+df['speed'] = (df['speed'] - df['speed'].min()) / (df['speed'].max() - df['speed'].min())
 
-# Add exact numbers on top of bars
-for bar in bars:
-    yval = bar.get_height()
-    plt.text(bar.get_x() + bar.get_width()/2, yval + 1, f'{yval:.1f}%', ha='center', va='bottom', fontweight='bold')
+df['Label'] = 1 # Normal (Default)
+df.loc[(df['time'] >= 190.0) & (df['time'] <= 257.99), 'Label'] = 0
+df.loc[(df['time'] >= 258.0) & (df['time'] <= 350.00), 'Label'] = 1
+df.loc[(df['time'] >= 468.0) & (df['time'] <= 492.99), 'Label'] = 2
+df.loc[(df['time'] >= 506.0) & (df['time'] <= 515.99), 'Label'] = 2
+df.loc[(df['time'] >= 353.0) & (df['time'] <= 467.99), 'Label'] = 3
+df.loc[(df['time'] >= 493.0) & (df['time'] <= 505.99), 'Label'] = 4
+df.loc[(df['time'] >= 516.0) & (df['time'] <= 524.99), 'Label'] = 4
 
-plt.ylim(0, 110)
-plt.title('SMOTE + CNN-LSTM: 5-Fold Cross Validation Accuracy', fontsize=14, fontweight='bold')
-plt.ylabel('Accuracy (%)')
-plt.legend()
-plt.tight_layout()
-plt.savefig('kfold_results.png', dpi=300) # Saves the graph as a high-quality image
-plt.show()
+print("3. Processing Data (FFT)...")
+X_raw, y_true = [], []
+for i in range(0, len(df) - 15, 2): 
+    X_raw.append(df[['amplified flux', 'speed']].iloc[i : i + 15].values)
+    y_true.append(df['Label'].iloc[i + 15 - 1]) 
 
-# GRAPH 2: The Confusion Matrix (Using the data from the last fold)
-# Make predictions using the trained model
-y_pred = model.predict(X_val)
+X_fft = np.abs(fft(np.array(X_raw), axis=1))
 
-# Convert predictions and actual labels from One-Hot to normal numbers (0, 1, 2, 3, 4)
-y_pred_classes = np.argmax(y_pred, axis=1)
-y_true_classes = np.argmax(y_val, axis=1)
+print("4. AI is taking the Test...")
+y_pred_probs = model.predict(X_fft)
+y_pred = np.argmax(y_pred_probs, axis=1)
 
-# Generate Matrix
-cm = confusion_matrix(y_true_classes, y_pred_classes)
-class_names = ['No Load', 'Normal Load', 'High Res.', 'Overload', 'Phase Open']
+class_names = ['No Load', 'Normal Load', 'High Res', 'Overload', 'Phase Open']
 
-plt.figure(figsize=(9, 7))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names, 
+print("5. Generating the Final 5x5 Confusion Matrix...")
+cm = confusion_matrix(y_true, y_pred, labels=[0, 1, 2, 3, 4])
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+            xticklabels=class_names, yticklabels=class_names, 
             annot_kws={"size": 14, "weight": "bold"})
-plt.title('AI Brain: Confusion Matrix (Fold 5 Test Data)', fontsize=16, fontweight='bold')
-plt.ylabel('Actual Motor State (True Truth)', fontsize=12)
-plt.xlabel('AI Predicted State', fontsize=12)
+plt.title('CNN-LSTM Model: Flux + Speed', fontsize=16, fontweight='bold')
+plt.ylabel('Actual Hardware State', fontsize=12, fontweight='bold')
+plt.xlabel('AI Predicted State', fontsize=12, fontweight='bold')
 plt.tight_layout()
-plt.savefig('confusion_matrix.png', dpi=300) # Saves the graph as a high-quality image
+plt.savefig('Final_Confusion_Matrix.png', dpi=300)
 plt.show()
 
-print("Graphs successfully generated and saved as PNG images!")
+print("\n=== CLASSIFICATION REPORT ===")
+print(classification_report(y_true, y_pred, target_names=class_names, zero_division=0))

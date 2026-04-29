@@ -1,41 +1,23 @@
 import pandas as pd
 import numpy as np
-import os
 from scipy.fft import fft
 from imblearn.over_sampling import SMOTE
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Conv1D, MaxPooling1D, LSTM, Dense, Dropout, Attention, GlobalAveragePooling1D
 from tensorflow.keras.utils import to_categorical
 
-print("1. Loading the New Dataset with SPEED & FLUX...")
+print("1. Loading the PERFECTLY CLEANED Dataset...")
+# Ab hum seedha 1.py ka banaya hua clean data use kar rahe hain!
+file_path = r"C:\SEC project\hybrid_motor_data.csv"
+df = pd.read_csv(file_path)
 
-# Smart File Loader: Handles invisible Windows characters (BOM) and skips bad rows
-file_path = r"C:\SEC project\INDUCTION.txt"
-
-# Fallback in case your file is inside the .vscode folder
-if not os.path.exists(file_path):
-    file_path = r"C:\SEC project\.vscode\INDUCTION.txt"
-
-df = pd.read_csv(file_path, encoding='utf-8-sig', on_bad_lines='skip')
-
-# Clean all column names (lowercase and remove extra spaces)
-df.columns = df.columns.str.strip().str.lower()
-print("✅ Columns detected in file:", df.columns.tolist())
-
-# Rename columns if they don't exactly match to prevent KeyErrors
-if 'timestamp' in df.columns:
-    df.rename(columns={'timestamp': 'time'}, inplace=True)
-if 'flux' in df.columns and 'amplified flux' not in df.columns:
-    df.rename(columns={'flux': 'amplified flux'}, inplace=True)
-
-# Safely extract Time, Amplified Flux, and Speed
+# Safely extract columns
 df['time'] = pd.to_numeric(df['time'], errors='coerce')
 df['amplified flux'] = pd.to_numeric(df['amplified flux'], errors='coerce')
 df['speed'] = pd.to_numeric(df['speed'], errors='coerce')
-
-# Drop any rows where these crucial sensors missed a reading
 df = df.dropna(subset=['time', 'amplified flux', 'speed'])
-print(f"✅ Data Cleaned! Total Valid Rows: {len(df)}")
+
+print(f"✅ Data Ready! Total Valid Rows: {len(df)}")
 
 print("2. Normalizing the Features (Scaling Speed & Flux)...")
 df['amplified flux'] = (df['amplified flux'] - df['amplified flux'].min()) / (df['amplified flux'].max() - df['amplified flux'].min())

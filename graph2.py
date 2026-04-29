@@ -1,64 +1,61 @@
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from tensorflow.keras.models import load_model
-from sklearn.metrics import confusion_matrix, classification_report
-from scipy.fft import fft
+import os
 
-print("1. Loading the Trained AI Brain and Hardware Data...")
-model = load_model(r"C:\SEC project\best_attention_motor_model.h5")
-df = pd.read_csv(r"C:\SEC project\hybrid_motor_data.csv")
+print("Generating the Direct Correlation Mapping: Flux vs Speed Cluster Plot...")
 
-# Ensure proper formatting
-df['Timestamp'] = pd.to_numeric(df['Timestamp'], errors='coerce')
-df['Flux'] = pd.to_numeric(df['Flux'], errors='coerce')
-df['Voltage'] = pd.to_numeric(df['Voltage'], errors='coerce')
-df = df.dropna(subset=['Timestamp', 'Flux', 'Voltage'])
+# Define the absolute path to your perfectly generated CSV from Turn 10
+file_path = r"C:\SEC project\hybrid_motor_data.csv"
 
-print("2. Assigning ALL 5 Classes based on Lab Notebook...")
-df['Label'] = 1 # Normal (Default)
-df.loc[(df['Timestamp'] >= 190.0) & (df['Timestamp'] <= 257.99), 'Label'] = 0  # No Load
-df.loc[(df['Timestamp'] >= 258.0) & (df['Timestamp'] <= 350.00), 'Label'] = 1  # Normal
-df.loc[(df['Timestamp'] >= 468.0) & (df['Timestamp'] <= 492.99), 'Label'] = 2  # High Res
-df.loc[(df['Timestamp'] >= 506.0) & (df['Timestamp'] <= 515.99), 'Label'] = 2  # High Res
-df.loc[(df['Timestamp'] >= 353.0) & (df['Timestamp'] <= 467.99), 'Label'] = 3  # Overload
-df.loc[(df['Timestamp'] >= 493.0) & (df['Timestamp'] <= 505.99), 'Label'] = 4  # Phase Open
-df.loc[(df['Timestamp'] >= 516.0) & (df['Timestamp'] <= 524.99), 'Label'] = 4  # Phase Open
+# Double check file existence again just to be bulletproof
+if not os.path.exists(file_path):
+    print(f"❌ ERROR: Cleaned data file not found at {file_path}. Did Step 1 finish successfully?")
+else:
+    # Load and clean data (Same cleaning steps as training)
+    df = pd.read_csv(file_path)
+    df['time'] = pd.to_numeric(df['time'], errors='coerce')
+    df['amplified flux'] = pd.to_numeric(df['amplified flux'], errors='coerce')
+    df['speed'] = pd.to_numeric(df['speed'], errors='coerce')
+    df = df.dropna(subset=['time', 'amplified flux', 'speed'])
 
-print("3. Processing Data (FFT)...")
-f, N, Kw = 50.0, 250.0, 0.955
-df['Calculated_Flux'] = df['Voltage'] / (4.44 * f * N * Kw) 
+    # === SEGMENT DATA BASED ON YOUR ESTABLISHED TIMESTAMPS ===
+    # Using the same precise ranges from Turn 5 / Training Script
 
-df['Flux'] = (df['Flux'] - df['Flux'].min()) / (df['Flux'].max() - df['Flux'].min())
-df['Calculated_Flux'] = (df['Calculated_Flux'] - df['Calculated_Flux'].min()) / (df['Calculated_Flux'].max() - df['Calculated_Flux'].min())
+    # 1. Healthy Operating State (No Load + Normal Load background contrast)
+    df_healthy = df[(df['time'] >= 190.0) & (df['time'] < 350.0)]
 
-X_raw, y_true = [], []
-for i in range(0, len(df) - 15, 2): 
-    X_raw.append(df[['Flux', 'Calculated_Flux']].iloc[i : i + 15].values)
-    y_true.append(df['Label'].iloc[i + 15 - 1]) 
+    # 2. OVERLOAD FAULT (Emphasized with Red Markers)
+    df_overload = df[(df['time'] >= 353.0) & (df['time'] <= 468.0)]
 
-X_fft = np.abs(fft(np.array(X_raw), axis=1))
+    # 3. SINGLE PHASE OPEN FAULT (Emphasized with Orange Markers)
+    # Merging ranges from Turn 5 for direct correlation view simplicity
+    df_phaseopen = df[(df['time'] >= 493.0) & (df['time'] <= 505.99) | (df['time'] >= 516.0) & (df['time'] <= 524.99)]
 
-print("4. AI is making predictions...")
-y_pred_probs = model.predict(X_fft)
-y_pred = np.argmax(y_pred_probs, axis=1)
+    print(f"✅ Segments loaded: Healthy({len(df_healthy)} points), Overload({len(df_overload)}), PhaseOpen({len(df_phaseopen)})")
 
-class_names = ['No Load', 'Normal Load', 'High Res', 'Overload', 'Phase Open']
+    # === Create the Scatter Plot ===
+    plt.figure(figsize=(10, 8))
 
-print("5. Generating the Perfect 5x5 Confusion Matrix...")
-cm = confusion_matrix(y_true, y_pred, labels=[0, 1, 2, 3, 4])
+    # Plot Background Healthy points (low visibility to emphasize faults)
+    plt.scatter(df_healthy['speed'], df_healthy['amplified flux'], color='skyblue', label='Healthy State (No Load/Normal)', alpha=0.3, s=15, marker='.')
 
-plt.figure(figsize=(10, 8))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-            xticklabels=class_names, yticklabels=class_names, 
-            annot_kws={"size": 14, "weight": "bold"})
-plt.title('CNN-LSTM Model: Confusion Matrix', fontsize=16, fontweight='bold')
-plt.ylabel('Actual Hardware State', fontsize=12, fontweight='bold')
-plt.xlabel('AI Predicted State', fontsize=12, fontweight='bold')
-plt.tight_layout()
-plt.savefig('ML_Confusion_Matrix.png', dpi=300)
-plt.show()
+    # Plot Overload Points (Emphasized Red Circles)
+    plt.scatter(df_overload['speed'], df_overload['amplified flux'], color='red', label='Overload Fault Cluster', alpha=0.8, s=25, marker='o', edgecolors='black')
 
-print("\n=== CLASSIFICATION REPORT ===")
-print(classification_report(y_true, y_pred, target_names=class_names, zero_division=0))
+    # Plot Phase Open Points (Emphasized Orange Triangles)
+    plt.scatter(df_phaseopen['speed'], df_phaseopen['amplified flux'], color='orange', label='Phase Open Fault Cluster', alpha=0.8, s=25, marker='^', edgecolors='darkorange')
+
+    # === Finalize Graph Aesthetics ===
+    plt.title('Motor Operation Mapping: Amplified Flux vs Speed', fontsize=16, fontweight='bold')
+    plt.xlabel('Motor Speed (RPM)', fontsize=12, fontweight='bold')
+    plt.ylabel('Amplified Flux (Sensor View)', fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(loc='best', shadow=True)
+
+    # Save and show
+    plt.tight_layout()
+    output_filename = r"C:\SEC project\Flux_vs_Speed_Cluster_Mapping.png"
+    plt.savefig(output_filename, dpi=300)
+    plt.show()
+
+    print(f"✅ Mapping graph successfully saved as: {output_filename}")

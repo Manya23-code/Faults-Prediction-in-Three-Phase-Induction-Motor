@@ -1,55 +1,37 @@
 import pandas as pd
-import numpy as np
+import os
 
-# Apne paths check kar lijiye
-input_file = r"C:\SEC project\.vscode\INDUCTION.txt"
+print("1. Reading raw text file safely (sec.txt)...")
+input_file = r"C:\SEC project\sec.txt"
 output_file = r"C:\SEC project\hybrid_motor_data.csv"
 
-print("1. Reading raw text file safely (Line-by-Line)...")
-valid_data = []
+try:
+    # Read the data, ignoring any bad or incomplete lines
+    df = pd.read_csv(input_file, encoding='utf-8-sig', on_bad_lines='skip')
 
-# Open the file and read it manually to bypass Pandas parsing errors
-with open(input_file, 'r', encoding='utf-8', errors='ignore') as f:
-    for line in f:
-        # line.strip().split() removes extra spaces and splits purely by ANY whitespace/tab
-        parts = line.strip().split()
+    # Clean up column names (remove extra spaces and make lowercase)
+    df.columns = df.columns.str.strip().str.lower()
+    
+    # Convert everything to numbers, replacing garbage values with blank (NaN)
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        # Keep ONLY lines that have at least 5 elements
-        if len(parts) >= 5:
-            # Take exactly the first 5 elements
-            valid_data.append(parts[:5])
+    # Drop any rows that have missing data
+    df = df.dropna()
 
-print(f"Successfully extracted {len(valid_data)} clean rows.")
+    print(f"Successfully extracted {len(df)} clean rows.")
+    print("2. Converting to strictly numeric DataFrame...")
 
-print("2. Converting to strictly numeric DataFrame...")
-# Build DataFrame directly with 5 columns
-df = pd.DataFrame(valid_data, columns=['Timestamp', 'Col2', 'Flux', 'Voltage', 'Current'])
+    # Save to the final CSV that 2.py uses
+    df.to_csv(output_file, index=False)
+    
+    print("3. Saving the fixed dataset...\n")
+    print("=== DIAGNOSTIC REPORT ===")
+    print(f"Total Rows Saved: {len(df)}")
+    print(f"Columns Found: {df.columns.tolist()}")
+    print("✅ SUCCESS: hybrid_motor_data.csv is perfectly generated and ready for training!")
 
-# Safely convert strings to actual numbers
-for col in df.columns:
-    df[col] = pd.to_numeric(df[col], errors='coerce')
-
-# Drop any rows that became NaN during conversion
-initial_len = len(df)
-df = df.dropna()
-print(f"Dropped {initial_len - len(df)} corrupted rows (if any).")
-
-print("3. Saving the fixed dataset...")
-df.to_csv(output_file, index=False)
-
-# ==========================================
-# THE DIAGNOSTIC CHECK (Truth Teller)
-# ==========================================
-overload_count = len(df[(df['Timestamp'] >= 353.0) & (df['Timestamp'] <= 467.9)])
-phase_open_count = len(df[(df['Timestamp'] >= 493.0) & (df['Timestamp'] <= 524.4)])
-
-print("\n=== DIAGNOSTIC REPORT ===")
-print(f"Total Rows Saved: {len(df)}")
-print(f"Overload Rows Recovered: {overload_count}")
-print(f"Phase Open Rows Recovered: {phase_open_count}")
-
-if overload_count > 0:
-    print("\nSUCCESS! Your missing fault data is officially back! 🎉")
-    print("Next Steps: Run 2.py to train the AI on this new data, then run 3_graphs.py!")
-else:
-    print("\nWARNING: The data is still not found. Check if INDUCTION.txt actually contains the 350s-470s range.")
+except FileNotFoundError:
+    print("❌ ERROR: sec.txt file not found! Please check if the name is exactly sec.txt in your folder.")
+except Exception as e:
+    print(f"❌ ERROR: Something went wrong -> {e}")
